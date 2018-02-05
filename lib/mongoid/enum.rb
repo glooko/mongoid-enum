@@ -51,7 +51,7 @@ module Mongoid
 
       def define_value_scopes_and_accessors(field_name, values, options)
         values.each do |value|
-          scope value, ->{ where(field_name => value) }
+          scope value, ->{ ::Rails.logger.fatal "MONGOID_ENUM_TRACER: Scope `#{self}##{field_name}.#{value}` called from #{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}"; where(field_name => value) }
 
           if options[:multiple]
             define_array_accessor(field_name, value)
@@ -70,23 +70,24 @@ module Mongoid
       end
 
       def define_array_field_accessor(name, field_name)
-        class_eval "def #{name}=(vals) self.write_attribute(:#{field_name}, Array(vals).compact.map(&:to_sym)) end"
-        class_eval "def #{name}() self.read_attribute(:#{field_name}) end"
+        class_eval "def #{name}=(vals) ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Array setter `#{self}##{name}.#{field_name}=` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.write_attribute(:#{field_name}, Array(vals).compact.map(&:to_sym)) end"
+        class_eval "def #{name}() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Array getter `#{self}##{name}.#{field_name}` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.read_attribute(:#{field_name}) end"
       end
 
       def define_string_field_accessor(name, field_name)
-        class_eval "def #{name}=(val) self.write_attribute(:#{field_name}, val && val.to_sym || nil) end"
-        class_eval "def #{name}() self.read_attribute(:#{field_name}) end"
+        class_eval "def #{name}=(val) ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Field setter `#{self}##{name}.#{field_name}=` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.write_attribute(:#{field_name}, val && val.to_sym || nil) end"
+        class_eval "def #{name}() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Field getter `#{self}##{name}.#{field_name}` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.read_attribute(:#{field_name}) end"
       end
 
       def define_array_accessor(field_name, value)
-        class_eval "def #{value}?() self.#{field_name}.include?(:#{value}) end"
-        class_eval "def #{value}!() update_attributes! :#{field_name} => (self.#{field_name} || []) + [:#{value}] end"
+        class_eval "def #{value}?() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Array inquirer `#{self}##{field_name}.#{value}?` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.#{field_name}.include?(:#{value}) end"
+        class_eval "def #{value}!() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Array value setter `#{self}##{field_name}.#{value}=` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; update_attributes! :#{field_name} => (self.#{field_name} || []) + [:#{value}] end"
       end
 
       def define_string_accessor(field_name, value)
-        class_eval "def #{value}?() self.#{field_name} == :#{value} end"
-        class_eval "def #{value}!() update_attributes! :#{field_name} => :#{value} end"
+        method_name = value.to_s.gsub('-', '_').to_sym
+        class_eval "def #{method_name}?() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Field inquirer `#{self}##{field_name}.#{value}?` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; self.#{field_name} == :#{value} end"
+        class_eval "def #{method_name}!() ::Rails.logger.fatal \"MONGOID_ENUM_TRACER: Field value setter `#{self}##{field_name}.#{value}=` called from \#{::Rails.backtrace_cleaner.clean(caller).presence || caller.first}\"; update_attributes! :#{field_name} => :#{value} end"
       end
     end
   end
